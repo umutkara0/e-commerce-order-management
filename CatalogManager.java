@@ -40,7 +40,7 @@ public final class CatalogManager {
 }
 
 // Katalogdaki ürünlerin temel sınıfı
-class Product {
+class Product implements OrderElement {
     private final String id;
     private final String name;
     private final double price;
@@ -49,6 +49,11 @@ class Product {
         this.id = id;
         this.name = name;
         this.price = price;
+    }
+
+    @Override
+    public void accept(OrderVisitor visitor) {
+        visitor.visit(this);
     }
 
     public String getId() { return id; }

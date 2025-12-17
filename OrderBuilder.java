@@ -1,12 +1,13 @@
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 // 1. Kompleks Nesne: Order
-class Order {
+class Order implements OrderElement {
     private String customerInfo;
     private List<Product> items;
     private double totalAmount;
     private String shippingAddress;
+    private String status = "PENDING"; // Durum bilgisi Memento için önemli
 
     // Yalnızca Builder tarafından çağrılabilmesi için private veya package private yapıcı metot.
     Order() {
@@ -18,6 +19,34 @@ class Order {
     void setItems(List<Product> items) { this.items = items; }
     void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
     void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
+    // YENİ DURUM SETTER
+    public void setStatus(String status) { this.status = status; }
+    public String getStatus() { return status; }
+    public List<Product> getItems() { return items; }
+    public double getTotalAmount() { return totalAmount; }
+
+    // MEMENTO DESENİ METOTLARI
+    public OrderMemento saveState() {
+        System.out.println("Order: Durum kaydediliyor...");
+        return new OrderMemento(this.status, this.totalAmount);
+    }
+
+    public void restoreState(OrderMemento memento) {
+        this.status = memento.getStatus();
+        this.totalAmount = memento.getTotal();
+        System.out.println("Order: Durum geri yüklendi. Yeni Durum: " + this.status);
+    }
+
+    // VISITOR DESENİ METODU
+    @Override
+    public void accept(OrderVisitor visitor) {
+        // Ziyaretçinin her bir öğeyi ziyaret etmesini sağla
+        for (Product item : items) {
+            item.accept(visitor);
+        }
+        // Siparişin kendisini de ziyaret ettirebiliriz
+        visitor.visit(this); 
+    }
 
     // Display metodu (İşlevi göstermek için)
     @Override
