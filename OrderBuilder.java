@@ -35,6 +35,7 @@ class Order implements OrderElement {
         this.status = memento.getStatus();
         this.totalAmount = memento.getTotal();
         System.out.println("Order: Durum geri yüklendi. Yeni Durum: " + this.status);
+        System.out.println("Order: Durum geri yüklendi. Yeni Tutar: " + this.totalAmount);
     }
 
     // VISITOR DESENİ METODU

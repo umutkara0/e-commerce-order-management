@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
 
@@ -11,13 +12,13 @@ public class OrderManagementSystem extends JFrame {
     private DiscountContext discountContext = new DiscountContext(); // Strategy
     private History orderHistory = new History(); // Memento (Caretaker)
     private Order currentOrder;
-    double finalPrice;
     
     // UI Bileşenleri - Sınıf seviyesinde tanımlı
     private JTextArea logArea;
     private JLabel statusLabel;
     private JCheckBox giftWrapCb, insuranceCb;
     private JComboBox<String> typeCombo, gatewayCombo;
+    private JComboBox<String> regionCombo;
 
     public OrderManagementSystem() {
         setTitle("Design Patterns E-Market");
@@ -56,8 +57,15 @@ public class OrderManagementSystem extends JFrame {
         bridgePanel.add(new JLabel("Altyapı:"));
         bridgePanel.add(gatewayCombo);
 
+        JPanel factoryPanel = new JPanel();
+        factoryPanel.setBorder(BorderFactory.createTitledBorder("Teslimat Bölgesi (Abstract Factory)"));
+        regionCombo = new JComboBox<>(new String[]{"Yurtiçi (Domestic)", "Yurtdışı (International)"});
+        factoryPanel.add(new JLabel("Bölge:"));
+        factoryPanel.add(regionCombo);
+
         configPanel.add(decoratorPanel);
         configPanel.add(bridgePanel);
+        configPanel.add(factoryPanel);
 
         // 3. İşlem Butonları (Facade, Strategy, Memento, Chain, Template)
         JPanel actionPanel = new JPanel(new GridLayout(2, 3));
@@ -73,22 +81,33 @@ public class OrderManagementSystem extends JFrame {
 
         JButton finalizeBtn = new JButton("Öde ve Onayla (Bridge/Chain)");
         finalizeBtn.addActionListener(e -> {
-            applyPackaging(); // Önce paketi hesapla
-            runPayment();     // Sonra öde (Bridge)
-            runChain();       // En son onayla (Chain)
+            if(runChain()) {
+                applyPackaging(); // Önce paketi hesapla
+                shippingAndTax();
+                runPayment();     // Sonra öde (Bridge)
+                finalizeProcess();};
+            
         });
 
-        JButton reportBtn = new JButton("Stok Raporu (Template)");
-        reportBtn.addActionListener(e -> {
+        JButton salesReportBtn = new JButton("Satış Raporu (Template)");
+        salesReportBtn.addActionListener(e -> {
             SalesReport reporter = new SalesReport();
-            reporter.generateReport(); // Dinamik verilerle rapor basar
+            logArea.setText(""); // Temizle
+            logArea.append(reporter.generateReport());
+        });
+        JButton InventoryReportBtn = new JButton("Stok Raporu (Template)");
+        InventoryReportBtn.addActionListener(e -> {
+            InventoryReporter reporter = new InventoryReporter();
+            logArea.setText(""); // Temizle
+            logArea.append(reporter.generateReport());
         });
 
         actionPanel.add(buyNowBtn);
         actionPanel.add(discountBtn);
         actionPanel.add(undoBtn);
         actionPanel.add(finalizeBtn);
-        actionPanel.add(reportBtn);
+        actionPanel.add(salesReportBtn);
+        actionPanel.add(InventoryReportBtn);
 
         // 4. Log Paneli
         logArea = new JTextArea();
@@ -102,16 +121,23 @@ public class OrderManagementSystem extends JFrame {
     }
 
     // --- DESEN TETİKLEYİCİ METOTLAR ---
-    
+    private List<Product> selectedItems = new ArrayList<>();
+
     private void selectProduct(Product p) {
-        // Builder Kullanımı
+        // 1. Ürünü listeye ekle (Sepete ekleme mantığı)
+        selectedItems.add(p);
+        
+        // 2. BUILDER: Mevcut tüm ürünlerle siparişi yeniden inşa et 
         currentOrder = new ConcreteOrderBuilder()
                 .buildCustomerInfo("Müşteri 1")
-                .buildItems(List.of(p))
+                .buildItems(new ArrayList<>(selectedItems)) // Mevcut listenin kopyasını gönderir
                 .calculateTotal()
                 .getResult();
-        logArea.append("\n>>> Yeni Sipariş: " + p.getName() + " eklendi.\n");
-        orderHistory.add(currentOrder.saveState()); // Memento Kaydı
+
+        logArea.append("Sepete Eklendi: " + p.getName() + " | Güncel Toplam: " + currentOrder.getTotalAmount() + " TL\n");
+        
+        // 3. MEMENTO: Her eklemede durumu kaydet 
+        orderHistory.add(currentOrder.saveState());
     }
 
     private void applyPackaging() {
@@ -142,8 +168,8 @@ public class OrderManagementSystem extends JFrame {
         if (currentOrder != null) {
             // Strategy Kullanımı
             discountContext.setDiscountStrategy(new PercentageDiscount(0.10));
-            finalPrice = discountContext.getFinalPrice(currentOrder.getTotalAmount());
-            logArea.append("Strategy: %10 İndirim uygulandı. Yeni Fiyat: " + finalPrice + " TL\n");
+            currentOrder.setTotalAmount(discountContext.getFinalPrice(currentOrder.getTotalAmount()));
+            logArea.append("Strategy: %10 İndirim uygulandı. Yeni Fiyat: " + currentOrder.getTotalAmount() + " TL\n");
         }
     }
 
@@ -153,21 +179,67 @@ public class OrderManagementSystem extends JFrame {
         if (last != null && currentOrder != null) {
             currentOrder.restoreState(last);
             logArea.append("Memento: Önceki duruma geri dönüldü.\n");
+            logArea.append("Order: Durum geri yüklendi. Yeni Tutar: " + currentOrder.getTotalAmount());
         }
     }
 
-    private void runChain() {
-        if (currentOrder == null) return;
+    private void shippingAndTax() {
+        SupplyChainFactory factory;
+        if (regionCombo.getSelectedItem().toString().contains("Domestic")) {
+            factory = new DomesticFactory();
+        } else {
+            factory = new InternationalFactory();
+        }
+
+        Shipping shipping = factory.createShipping(); // Fabrikadan kargo nesnesi al
+        Tax tax = factory.createTax();             // Fabrikadan vergi nesnesi al
+
+        double baseTotal = currentOrder.getTotalAmount();
+        double shippingCost = shipping.calculateCost(2.0); // Örnek 2kg ağırlık
+        double taxAmount = tax.calculateTax(baseTotal);
+        currentOrder.setTotalAmount(baseTotal + shippingCost + taxAmount);
+
+        logArea.append("\n--- Abstract Factory Sonuçları ---\n");
+        logArea.append("Bölgeye Özgü Kargo: " + shipping.getShippingType() + " (" + shippingCost + " TL)\n");
+        logArea.append("Bölgeye Özgü Vergi Oranı: %" + (tax.getTaxRate() * 100) + "\n");
+        logArea.append("Final Ödenecek Tutar: " + currentOrder.getTotalAmount() + " TL\n");
+    }
+
+    private boolean runChain() {
+        if (currentOrder == null) return false;
         // Chain of Responsibility Kullanımı
         OrderHandler stock = new StockCheckHandler();
         OrderHandler payment = new PaymentCheckHandler();
         stock.setNextHandler(payment);
         boolean result = stock.handle(currentOrder);
-        logArea.append(result ? "Chain: Kontroller başarılı, sipariş onaylandı.\n" : "Chain: Kontrol başarısız!\n");
-        //geçici
+        if (result) {
+            logArea.append("Chain: Tüm kontroller başarıyla geçildi. Sipariş onaylandı.\n");
+        } else {
+            // Zincirin nerede koptuğunu Order nesnesinden alıyoruz
+            logArea.append("Chain Kontrolü Durduruldu: " + currentOrder.getStatus() + "\n");
+            return false;
+        }
+        return true;
+    }
+
+    private void finalizeProcess() {
+        for (Product p : currentOrder.getItems()) {
+            int currentStock = p.getStock();
+            if (currentStock > 0) {
+                p.setStock(currentStock - 1);
+            }
+        }
         String orderId = "ORD-" + System.currentTimeMillis();
-        OrderStorage.saveToCSV(orderId, "Müşteri_1", finalPrice);
+        OrderStorage.saveToCSV(orderId, currentOrder.getItems(), "Müşteri_1", currentOrder.getTotalAmount());
+        OrderStorage.updateInventoryCSV(CatalogManager.getInstance().getAllProducts());
         logArea.append("Sipariş kaydedildi.\n");
+
+        selectedItems.clear(); // Listeyi boşalt
+        currentOrder = null;   // Sipariş nesnesini temizle
+        
+        // GUI bileşenlerini sıfırla
+        giftWrapCb.setSelected(false);
+        insuranceCb.setSelected(false);
     }
 
     private void runPayment() {

@@ -57,7 +57,7 @@ public class BehavioralPatternMain {
 
         // 5. TEMPLATE METHOD Testi
         System.out.println("\n--- TEMPLATE METHOD TESTI ---");
-        ReportGenerator salesReport = new SalesReporter();
+        ReportGenerator salesReport = new SalesReport();
         salesReport.generateReport();
 
         ReportGenerator inventoryReport = new InventoryReporter();

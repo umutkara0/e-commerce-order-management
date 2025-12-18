@@ -1,4 +1,4 @@
-// 1. Handler Arayüzü
+
 interface OrderHandler {
     void setNextHandler(OrderHandler handler);
     boolean handle(Order order); // true: Başarılı, false: Zincir kırıldı/Başarısız
@@ -30,9 +30,15 @@ class StockCheckHandler extends AbstractOrderHandler {
     protected boolean process(Order order) {
         // Gerçekte InventoryService çağrılır
         boolean stocked = true; 
+        for(Product p : order.getItems()) {
+            if(p.getStock() == 0) {
+                stocked = false;
+                order.setStatus("HATA: " + p.getName() + " stokta yok!");
+                break;
+            }
+        }
         System.out.println("Chain: Stok Kontrolü -> " + (stocked ? "OK" : "YETERSİZ"));
         if (!stocked) {
-            order.setStatus("STOCK_FAILED");
             return false;
         }
         return true;
@@ -53,7 +59,7 @@ class PaymentCheckHandler extends AbstractOrderHandler {
         boolean paymentOK = true; 
         System.out.println("Chain: Ödeme Kontrolü -> " + (paymentOK ? "OK" : "HATALI"));
         if (!paymentOK) {
-            order.setStatus("PAYMENT_FAILED");
+            order.setStatus("HATA: Ödeme Başarısız!");
             return false;
         }
         return true;

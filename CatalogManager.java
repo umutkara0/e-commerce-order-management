@@ -16,9 +16,9 @@ public final class CatalogManager {
     private CatalogManager() {
         products = new ArrayList<>();
         // Basit ürünler ekleyelim
-        products.add(new Product("P101", "Akıllı Telefon", 5000.0));
-        products.add(new Product("P102", "Dizüstü Bilgisayar", 12000.0));
-        products.add(new Product("P103", "Kablosuz Kulaklık", 800.0));
+        products.add(new Product("P101", "Akıllı Telefon", 5000.0,2));
+        products.add(new Product("P102", "Dizüstü Bilgisayar", 12000.0,2));
+        products.add(new Product("P103", "Kablosuz Kulaklık", 800.0,2));
     }
 
     // 4. Singleton örneğine erişim noktası.
@@ -44,11 +44,13 @@ class Product implements OrderElement {
     private final String id;
     private final String name;
     private final double price;
+    private int stock;
 
-    public Product(String id, String name, double price) {
+    public Product(String id, String name, double price, int stock) {
         this.id = id;
         this.name = name;
         this.price = price;
+        this.stock = stock;
     }
 
     @Override
@@ -59,4 +61,7 @@ class Product implements OrderElement {
     public String getId() { return id; }
     public String getName() { return name; }
     public double getPrice() { return price; }
+    public int getStock() { return stock; }
+
+    public void setStock(int stock) { this.stock = stock; }
 }
