@@ -11,6 +11,7 @@ public class OrderManagementSystem extends JFrame {
     private DiscountContext discountContext = new DiscountContext(); // Strategy
     private History orderHistory = new History(); // Memento (Caretaker)
     private Order currentOrder;
+    double finalPrice;
     
     // UI Bileşenleri - Sınıf seviyesinde tanımlı
     private JTextArea logArea;
@@ -79,7 +80,7 @@ public class OrderManagementSystem extends JFrame {
 
         JButton reportBtn = new JButton("Stok Raporu (Template)");
         reportBtn.addActionListener(e -> {
-            InventoryReporter reporter = new InventoryReporter();
+            SalesReport reporter = new SalesReport();
             reporter.generateReport(); // Dinamik verilerle rapor basar
         });
 
@@ -141,7 +142,7 @@ public class OrderManagementSystem extends JFrame {
         if (currentOrder != null) {
             // Strategy Kullanımı
             discountContext.setDiscountStrategy(new PercentageDiscount(0.10));
-            double finalPrice = discountContext.getFinalPrice(currentOrder.getTotalAmount());
+            finalPrice = discountContext.getFinalPrice(currentOrder.getTotalAmount());
             logArea.append("Strategy: %10 İndirim uygulandı. Yeni Fiyat: " + finalPrice + " TL\n");
         }
     }
@@ -163,6 +164,10 @@ public class OrderManagementSystem extends JFrame {
         stock.setNextHandler(payment);
         boolean result = stock.handle(currentOrder);
         logArea.append(result ? "Chain: Kontroller başarılı, sipariş onaylandı.\n" : "Chain: Kontrol başarısız!\n");
+        //geçici
+        String orderId = "ORD-" + System.currentTimeMillis();
+        OrderStorage.saveToCSV(orderId, "Müşteri_1", finalPrice);
+        logArea.append("Sipariş kaydedildi.\n");
     }
 
     private void runPayment() {
