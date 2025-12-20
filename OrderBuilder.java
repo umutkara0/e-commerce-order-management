@@ -6,8 +6,8 @@ class Order implements OrderElement {
     private String customerInfo;
     private List<Product> items;
     private double totalAmount;
-    private String shippingAddress;
     private String status = "PENDING"; // Durum bilgisi Memento için önemli
+    private boolean discountApplied = false;
 
     // Yalnızca Builder tarafından çağrılabilmesi için private veya package private yapıcı metot.
     Order() {
@@ -18,23 +18,27 @@ class Order implements OrderElement {
     void setCustomerInfo(String customerInfo) { this.customerInfo = customerInfo; }
     void setItems(List<Product> items) { this.items = items; }
     void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
-    void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
+    public void setDiscountApplied(boolean applied) { this.discountApplied = applied; }
     // YENİ DURUM SETTER
     public void setStatus(String status) { this.status = status; }
     public String getStatus() { return status; }
     public List<Product> getItems() { return items; }
     public double getTotalAmount() { return totalAmount; }
+    public boolean isDiscountApplied() { return discountApplied; }
 
     // MEMENTO DESENİ METOTLARI
     public OrderMemento saveState() {
         System.out.println("Order: Durum kaydediliyor...");
-        return new OrderMemento(this.status, this.totalAmount);
+        return new OrderMemento(this.status, new ArrayList<>(this.items), this.totalAmount, this.discountApplied);
     }
 
     public void restoreState(OrderMemento memento) {
         this.status = memento.getStatus();
+        this.items = memento.getProducts();
         this.totalAmount = memento.getTotal();
+        this.discountApplied = memento.isDiscountApplied();
         System.out.println("Order: Durum geri yüklendi. Yeni Durum: " + this.status);
+        System.out.println("Order: Durum geri yüklendi. Yeni Ürünler: " + this.items);
         System.out.println("Order: Durum geri yüklendi. Yeni Tutar: " + this.totalAmount);
     }
 
@@ -55,9 +59,8 @@ class Order implements OrderElement {
         return "--- SIPARIŞ DETAYLARI ---\n" +
                "Müşteri: " + customerInfo + "\n" +
                "Ürün Sayısı: " + items.size() + "\n" +
-               "Adres: " + shippingAddress + "\n" +
                "Toplam Tutar: " + totalAmount + " TL\n" +
-               "--------------------------";
+               "--------------------------\n";
     }
 }
 
@@ -66,7 +69,6 @@ interface OrderBuilder {
     OrderBuilder buildCustomerInfo(String info);
     OrderBuilder buildItems(List<Product> items);
     OrderBuilder calculateTotal();
-    OrderBuilder buildShippingAddress(String address);
     Order getResult();
 }
 
@@ -103,11 +105,6 @@ class ConcreteOrderBuilder implements OrderBuilder {
         return this;
     }
 
-    @Override
-    public OrderBuilder buildShippingAddress(String address) {
-        order.setShippingAddress(address);
-        return this;
-    }
 
     @Override
     public Order getResult() {

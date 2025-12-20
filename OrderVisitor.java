@@ -1,26 +1,29 @@
-// 1. Visitor Arayüzü
+// Visitor Arayüzü
 interface OrderVisitor {
     void visit(Product product);
-    void visit(Order order); // Yeni eklenen Order ziyareti
+    void visit(Order order);
 }
 
-// 2. Concrete Visitor: Fiyatları tekrar hesaplamak için
-class RecalculatePriceVisitor implements OrderVisitor {
-    private double newTotal = 0.0;
-    
+// Somut Ziyaretçi: Detaylı Analiz Ziyaretçisi
+class OrderAnalysisVisitor implements OrderVisitor {
+    private StringBuilder report = new StringBuilder();
+    private double totalWeight = 0;
+
     @Override
     public void visit(Product product) {
-        // Ürün fiyatına indirim veya ek vergi ekleme mantığı burada uygulanabilir.
-        newTotal += product.getPrice();
-        System.out.println("Ziyaretçi: Ürün " + product.getName() + " eklendi.");
+        // Her ürün için özel bir analiz yapıyoruz
+        report.append("- ").append(product.getName())
+              .append(" için kargo ağırlığı hesaplanıyor...\n");
+        totalWeight += 1.5; // Örnek: her ürün 1.5 kg varsayılsın
     }
 
     @Override
     public void visit(Order order) {
-        // Toplamı güncelledikten sonra siparişin toplamını set et
-        order.setTotalAmount(newTotal);
-        System.out.printf("Ziyaretçi: Yeni Sipariş Toplamı hesaplandı: %.2f TL\n", newTotal);
+        report.append("\nAnaliz Sonucu: Toplam Tahmini Ağırlık: ")
+              .append(totalWeight).append(" kg\n");
     }
 
-    public double getNewTotal() { return newTotal; }
+    public String getAnalysisReport() {
+        return report.toString();
+    }
 }

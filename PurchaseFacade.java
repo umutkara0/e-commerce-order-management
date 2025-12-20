@@ -1,68 +1,95 @@
-// Alt Sistem 1: Envanter
+// Alt Sistem 1: Envanter (Dinamik ve Kalıcı)
 class InventoryService {
+    private CatalogManager catalog = CatalogManager.getInstance(); //  Singleton
+
     public boolean checkStock(String productId) {
-        // Basit kontrol
+        Product p = catalog.getProductById(productId);
+        // [cite: 8] Minimal fonksiyonellik: Stok varsa true döner
+        return p != null && p.getStock() > 0;
+    }
+
+    public void updateInventory() {
+        //  Tüm ürünlerin güncel stoğunu CSV'ye yansıtır
+        OrderStorage.updateInventoryCSV(catalog.getAllProducts());
+        System.out.println("Envanter: CSV dosyası ve Singleton katalog güncellendi.");
+    }
+}
+
+// Alt Sistem 2: Ödeme İşlemcisi (Bridge Kullanımı)
+class PaymentService {
+    public boolean processSecurePayment(double amount, String provider) {
+        //  Bridge Deseni: Soyutlama (Processor) ve Uygulama (Gateway) ayrımı
+        PaymentImpl gateway = provider.equalsIgnoreCase("Stripe") ? new StripeGateway() : new PayPalGateway();
+        PaymentProcessor processor = new CreditCardPayment(gateway);
+        
+        processor.processPayment(amount);
+        System.out.println("Ödeme Servisi: " + amount + " TL tutarında işlem onaylandı.");
         return true; 
     }
-
-    public void decreaseStock(String productId) {
-        System.out.println("Envanterden ürün " + productId + " düşüldü.");
-    }
 }
 
-// Alt Sistem 2: Ödeme (Bridge desenindeki processor kullanılabilir, ama Façade için basitleştirilmiş bir versiyon yaratalım)
-class PaymentGatewayFacade {
-    public boolean process(double amount) {
-        System.out.printf("Ödeme alt sistemi: %.2f TL başarılı.\n", amount);
-        return true;
-    }
-}
-
-// Alt Sistem 3: Bildirim
-class NotificationService {
-    public void sendConfirmationEmail(String customerId, String orderId) {
-        System.out.println("Bildirim servisi: Müşteri " + customerId + " için sipariş " + orderId + " onay e-postası gönderildi.");
+// Alt Sistem 3: Sipariş Onay ve Kayıt
+class OrderFinalizer {
+    public void finalizeOrder(Order order) {
+        //  Memento: Siparişin final halini kaydet
+        History history = new History();
+        history.add(order.saveState());
+        
+        //  CSV: Siparişi kalıcı olarak kaydet
+        String orderId = "FAC-" + System.currentTimeMillis();
+        OrderStorage.saveToCSV(orderId, order.getItems(), "Facade_Müşterisi", order.getTotalAmount());
+        
+        System.out.println("Onay Servisi: Sipariş CSV'ye yazıldı ve Memento kaydı oluşturuldu.");
     }
 }
 
 /**
  * Façade Deseni Uygulaması: Karmaşık bir satın alma işlemini tek bir metotta birleştirir.
  */
-class PurchaseFacade {
-    private final InventoryService inventoryService;
-    private final PaymentGatewayFacade paymentGateway;
-    private final NotificationService notificationService;
+public class PurchaseFacade {
+    private InventoryService inventory = new InventoryService();
+    private PaymentService payment = new PaymentService();
+    private OrderFinalizer finalizer = new OrderFinalizer();
+    private OrderHandler chain;
 
     public PurchaseFacade() {
-        this.inventoryService = new InventoryService();
-        this.paymentGateway = new PaymentGatewayFacade();
-        this.notificationService = new NotificationService();
+        //  Chain of Responsibility yapılandırması
+        this.chain = new StockCheckHandler();
+        this.chain.setNextHandler(new PaymentCheckHandler());
     }
 
-    // Hemen Satın Al (Buy Now) işlevi
-    public boolean buyNow(Product product, String customerId) {
-        String orderId = "ORD-" + System.currentTimeMillis();
-        System.out.println("\n--- FACA DE SATIN ALMA BASLATILDI ---");
+    public boolean buyNow(Product product, String customer) {
+        System.out.println("\n--- FACADE: HIZLI SATIN ALMA BASLATILDI ---");
 
         // 1. Stok Kontrolü
-        if (!inventoryService.checkStock(product.getId())) {
-            System.out.println("Satın alma başarısız: Stok yetersiz.");
+        if (!inventory.checkStock(product.getId())) {
+            System.out.println("Hata: Stok yetersiz.");
             return false;
         }
 
-        // 2. Ödeme İşleme
-        if (!paymentGateway.process(product.getPrice())) {
-            System.out.println("Satın alma başarısız: Ödeme hatası.");
+        // 2. Sipariş İnşası (Builder) 
+        Order order = new ConcreteOrderBuilder()
+                .buildCustomerInfo(customer)
+                .buildItems(java.util.List.of(product))
+                .calculateTotal()
+                .getResult();
+
+        // 3. Ödeme İşlemi (Bridge Entegrasyonu) 
+        payment.processSecurePayment(order.getTotalAmount(), "Stripe");
+
+        // 4. Doğrulama Zinciri (Chain of Responsibility) 
+        if (!chain.handle(order)) {
             return false;
         }
 
-        // 3. Stok Düşme ve Sipariş Oluşturma
-        inventoryService.decreaseStock(product.getId());
-        
-        // 4. Bildirim
-        notificationService.sendConfirmationEmail(customerId, orderId);
-        
-        System.out.println("--- FACA DE SATIN ALMA BASARILI: Sipariş No: " + orderId + " ---");
+        // 5. Stok Düşürme ve CSV Güncelleme 
+        product.setStock(product.getStock() - 1);
+        inventory.updateInventory();
+
+        // 6. Kayıt ve Onay (Memento & CSV) 
+        finalizer.finalizeOrder(order);
+
+        System.out.println("--- FACADE: ISLEM BASARIYLA TAMAMLANDI ---\n");
         return true;
     }
 }
